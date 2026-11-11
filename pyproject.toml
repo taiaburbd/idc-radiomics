@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idc-radiomics"
+version = "0.1.0"
+description = "Zero-setup access to TotalSegmentator anatomy segmentations and radiomics features for NCI Imaging Data Commons CT scans. No BigQuery, no Google Cloud account."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Taiabur Rahman", email = "taiaburbd@gmail.com" }]
+keywords = ["medical-imaging", "radiomics", "idc", "cancer", "totalsegmentator", "dicom", "nci"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "duckdb>=0.10",
+    "pandas>=2.0",
+    "pyarrow>=14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/taiaburbd/idc-radiomics"
+"Data source" = "https://github.com/ImagingDataCommons/CloudSegmentatorResults"
+"IDC Portal" = "https://portal.imaging.datacommons.cancer.gov"
+
+[tool.setuptools.packages.find]
+where = ["src"]
