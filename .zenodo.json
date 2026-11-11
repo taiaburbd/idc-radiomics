@@ -1,0 +1,41 @@
+{
+  "title": "idc-radiomics: Zero-setup access to TotalSegmentator anatomy and radiomics features for NCI Imaging Data Commons CT scans",
+  "description": "Python library for querying TotalSegmentator anatomy segmentations and 28 per-structure radiomics features for 125k+ NLST CT scans from the NCI Imaging Data Commons, without BigQuery or a Google Cloud account. Streams the public CloudSegmentatorResults parquet via DuckDB httpfs.",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Rahman, Taiabur",
+      "affiliation": "Independent researcher"
+    }
+  ],
+  "keywords": [
+    "medical imaging",
+    "radiomics",
+    "DICOM",
+    "cancer imaging",
+    "NCI Imaging Data Commons",
+    "TotalSegmentator",
+    "DuckDB",
+    "parquet"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/taiaburbd/idc-radiomics",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "10.1148/rg.230180",
+      "relation": "cites",
+      "resource_type": "publication-article"
+    },
+    {
+      "identifier": "10.21203/rs.3.rs-4351526/v1",
+      "relation": "isDerivedFrom",
+      "resource_type": "publication-article"
+    }
+  ],
+  "communities": []
+}

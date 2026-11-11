@@ -15,7 +15,7 @@ big_livers = (
     Cohort()
     .organ("liver")
     .feature("Volume from Voxel Summation", min=2_000_000)
-    .only_complete()
+    .only_complete()  # QC-passed segmentations only
 )
 
 print(f"Cohort id: {big_livers.cohort_id()}")
@@ -25,7 +25,7 @@ print(f"Matching segments: {big_livers.count():,}\n")
 df = big_livers.to_df(limit=5)
 print(df[[
     "PatientID", "CT_SeriesInstanceUID", "bodyPart",
-    "Volume from Voxel Summation", "Sphericity",
+    "Volume from Voxel Summation", "segmentation_completeness",
 ]].to_string(index=False))
 
 # Viewer URLs — click to open the CT scan in the public IDC viewer

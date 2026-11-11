@@ -1,51 +1,121 @@
 # idc-radiomics
 
-**Zero-setup access to [TotalSegmentator][ts] anatomy segmentations and radiomics features for [NCI Imaging Data Commons][idc] CT scans — without BigQuery or a Google Cloud account.**
+**Query [NCI Imaging Data Commons](https://portal.imaging.datacommons.cancer.gov) (IDC) CT radiomics and [TotalSegmentator](https://github.com/wasserth/TotalSegmentator) segmentations from Python — no BigQuery, no Google Cloud account, no 1.35 GB download.**
 
-The IDC team ships ~9.5 million organ segmentations and 28 radiomics features per segment for 125,000+ public NLST CT scans. Until now, the only way to query them was BigQuery SQL with a Google Cloud login. This library streams the same data directly from the public GitHub release via DuckDB, so you can build cohorts in three lines of Python.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Code style: readable API](https://img.shields.io/badge/API-chainable%20Cohort-informational)](#quick-start)
 
-```python
-from idc_radiomics import Cohort
-
-big_livers = (
-    Cohort()
-    .organ("liver")
-    .feature("Volume from Voxel Summation", min=2_000_000)  # mm³ (≈ 2 L)
-    .only_complete()
-)
-
-print(big_livers.count())           # how many CTs match
-df = big_livers.to_df(limit=50)     # pandas DataFrame
-for url in big_livers.viewer_urls(limit=5):
-    print(url)                      # open in the IDC viewer
-```
-
-No credentials. No `gcloud auth`. No full-file download — DuckDB's httpfs extension streams just the row groups the filter needs.
+idc-radiomics is a small open-source library for **cancer imaging researchers**, **radiomics** workflows, and **IDC** users who want to explore **NLST** chest CT cohorts without standing up BigQuery. It streams the public [CloudSegmentatorResults](https://github.com/ImagingDataCommons/CloudSegmentatorResults) parquet release through **DuckDB** over HTTPS, so you filter millions of organ-level measurements in plain Python and jump straight to the IDC viewer for the scans you care about.
 
 ---
 
-## Install
+## Who this helps
+
+| You want to… | idc-radiomics gives you… |
+|---|---|
+| Find NLST CTs with large livers, wide aortas, or odd-shaped spleens | Chainable filters on **28 radiomics features** per structure |
+| Skip GCP setup and SQL joins across IDC BigQuery tables | One `pip install`, zero credentials |
+| Share an exact patient/segment list in a paper or with a collaborator | A stable **`cohort_id`** hash from your filter chain |
+| Open the underlying DICOM in the browser | **`viewer_urls()`** → public IDC viewer links |
+
+**Not a fit (yet):** writing radiomics from raw DICOM, non-CT modalities, or collections beyond NLST in v0.1. See [Roadmap](#roadmap).
+
+---
+
+## Quick start
 
 ```bash
 pip install idc-radiomics
 ```
 
-Requires Python 3.10+. Depends only on `duckdb`, `pandas`, `pyarrow`.
+```python
+from idc_radiomics import Cohort
+
+# Large livers on NLST CTs (~2 L in mm³). Volume is in mm³.
+big_livers = (
+    Cohort()
+    .organ("liver")
+    .feature("Volume from Voxel Summation", min=2_000_000)
+)
+
+print(big_livers.count())              # matching segments (CT × structure)
+print(big_livers.cohort_id())          # cite this in papers / supplements
+
+df = big_livers.to_df(limit=50)        # pandas DataFrame
+for url in big_livers.viewer_urls(limit=5):
+    print(url)                         # open CT in the IDC viewer
+```
+
+**First query note:** DuckDB indexes the remote parquet over HTTP. The first call on a machine can take tens of seconds; later calls on the same process reuse the connection and cache.
+
+**Requirements:** Python 3.10+. Dependencies: `duckdb`, `pandas`, `pyarrow` only.
 
 ---
 
-## What it gives you
+## Why not BigQuery?
 
-For every public NLST CT scan with a TotalSegmentator segmentation:
+IDC already exposes TotalSegmentator segmentations and per-segment radiomics for **125,000+** public NLST CT scans (~**9.5M** structure rows). The canonical path today is **Google BigQuery** plus multi-table joins (`segmentations`, `quantitative_measurements`, `dicom_all`). That works well if you live in GCP; many labs do not.
 
-| Field | Example | Notes |
-|---|---|---|
-| `PatientID`, `CT_SeriesInstanceUID`, `StudyInstanceUID` | — | Join keys back into IDC |
-| `totalsegSegmentLabel`, `bodyPart`, `laterality` | `kidney_left`, `kidney`, `left` | ~100 TotalSegmentator structures |
-| `segmentation_completeness`, QC flags | `complete` | Upstream heuristic QC |
-| 28 radiomics features per segment | `Volume from Voxel Summation`, `Sphericity`, `Mean`, `Skewness`, `Maximum 3D Diameter of a Mesh`, ... | See `idc_radiomics.FEATURES` |
+idc-radiomics reads the **same curated parquet** the IDC team publishes on GitHub ([release 0.0.1](https://github.com/ImagingDataCommons/CloudSegmentatorResults/releases/tag/0.0.1)). DuckDB’s **httpfs** extension fetches only the row groups your filter needs, so a typical cohort query moves megabytes, not the full **~1.35 GB** file.
 
-List every structure present in the current release:
+---
+
+## Install & develop
+
+```bash
+# PyPI (when published)
+pip install idc-radiomics
+
+# From source
+git clone https://github.com/taiaburbd/idc-radiomics.git
+cd idc-radiomics
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Unit tests (no network)
+pytest -m "not network"
+
+# Integration tests (live parquet over HTTPS)
+pytest -m network
+```
+
+Run the bundled example from the repo root:
+
+```bash
+python examples/basic.py
+```
+
+---
+
+## API at a glance
+
+`Cohort` is a **lazy** filter: nothing runs until you call `to_df()`, `count()`, `viewer_urls()`, or `cohort_id()`.
+
+| Method | What it does |
+|---|---|
+| `.organ("liver", "spleen", …)` | Match [TotalSegmentator](https://github.com/wasserth/TotalSegmentator) labels (~100 structures in the release) |
+| `.feature(name, min=…, max=…)` | Filter on radiomics columns (names must match `idc_radiomics.FEATURES` exactly) |
+| `.laterality("left")` / `"right"` | Paired structures |
+| `.only_complete()` | Keep upstream QC-passed rows (`segmentation_completeness`) |
+| `.patients("id1", "id2", …)` | Restrict to PatientIDs (e.g. from [idc-index](https://github.com/ImagingDataCommons/idc-index)) |
+| `.organs()` | Discover structures and counts in the current release |
+
+| Terminal call | Returns |
+|---|---|
+| `to_df(limit=1000)` | `pandas.DataFrame` — ID columns + any features used in `.feature()` |
+| `count()` | Number of matching segments |
+| `viewer_urls(limit=20)` | IDC viewer URLs for distinct studies/series |
+| `cohort_id()` | Reproducible id, e.g. `idcrad:v1:a3f2bc9e0d44` |
+
+List all **28 radiomics feature** names:
+
+```python
+from idc_radiomics import FEATURES
+print(len(FEATURES))  # 28
+```
+
+Discover what’s in the dataset:
 
 ```python
 Cohort().organs()
@@ -55,59 +125,118 @@ Cohort().organs()
 # ...
 ```
 
-## Reproducible cohorts
+---
 
-Every cohort has a stable 12-char hash:
+## What’s in each row?
 
-```python
->>> big_livers.cohort_id()
-'idcrad:v1:a3f2bc9e0d44'
-```
+For every NLST CT with a TotalSegmentator segmentation in release **0.0.1**:
 
-Cite the id in a paper; anyone can re-build the exact same cohort by re-running the chain. The id depends only on the filter spec and the pinned data release (`DATA_RELEASE = "0.0.1"` in `catalog.py`), not on the local machine or time.
+| Field | Example | Notes |
+|---|---|---|
+| `PatientID`, `CT_SeriesInstanceUID`, `StudyInstanceUID` | DICOM UIDs | Join keys back into IDC |
+| `totalsegSegmentLabel`, `bodyPart`, `laterality` | `kidney_left`, `kidney`, `left` | Structure identity |
+| `segmentation_completeness` | `pass`, `fail` | Upstream heuristic QC |
+| Radiomics (28 columns) | `Volume from Voxel Summation`, `Sphericity`, `Mean`, `Maximum 3D Diameter of a Mesh`, … | Full list: `FEATURES` |
+
+---
 
 ## Example cohorts
 
+Copy, tweak thresholds, cite `cohort_id()` in your methods section.
+
 ```python
-# Aorta diameter outliers (possible aneurysms)
+from idc_radiomics import Cohort
+
+# Possible aortic aneurysm screening signal (millimeters; validate clinically)
 Cohort().organ("aorta").feature("Maximum 3D Diameter of a Mesh", min=40)
 
-# Unusually elongated spleens
+# Morphology outlier spleens
 Cohort().organ("spleen").feature("Elongation", min=0.9)
 
-# Both kidneys, left side only
+# Left kidney only
 Cohort().organ("kidney_left").laterality("left")
 
-# Bring your own patient cohort — e.g. from idc-index
+# Intersect with your own patient list
 Cohort().patients("1.2.840.113654.2.55.123", "1.2.840.113654.2.55.456")
 ```
 
-## Data provenance & citation
+---
 
-Upstream data: **ImagingDataCommons/CloudSegmentatorResults** [release 0.0.1][release] (Thiriveedhi et al., *Cloud-based large-scale curation of medical imaging data using AI segmentation*, 2024, [doi:10.21203/rs.3.rs-4351526/v1][paper]).
+## Reproducible research
 
-If you publish work using this library, please cite the IDC and the upstream dataset:
+Every filter chain gets a short, stable hash:
+
+```python
+>>> Cohort().organ("liver").feature("Volume from Voxel Summation", min=2_000_000).cohort_id()
+'idcrad:v1:ca5a3209d67f'
+```
+
+The id depends on your filter spec and the pinned release (`DATA_RELEASE = "0.0.1"` in `src/idc_radiomics/catalog.py`), not on your laptop or the clock. When the upstream bundle bumps, the same filters produce a **new** id — so comparisons across releases stay honest.
+
+---
+
+## How it works (short)
+
+1. **Pinned artifact** — `qual_checks_and_quantitative_measurements.parquet` on [CloudSegmentatorResults 0.0.1](https://github.com/ImagingDataCommons/CloudSegmentatorResults/releases/tag/0.0.1).
+2. **DuckDB + httpfs** — `read_parquet('https://…')` with HTTP range reads.
+3. **Chainable SQL** — your `Cohort` builds a `WHERE` clause; predicates push into parquet where DuckDB can.
+4. **Lazy DuckDB import** — filter building and `cohort_id()` work without DuckDB loaded (handy for CI and unit tests).
+
+More rationale: [`DESIGN.md`](DESIGN.md).
+
+---
+
+## Citations & data provenance
+
+**Upstream segmentation + radiomics table:**  
+[ImagingDataCommons/CloudSegmentatorResults](https://github.com/ImagingDataCommons/CloudSegmentatorResults) release **0.0.1** — Thiriveedhi et al., *Cloud-based large-scale curation of medical imaging data using AI segmentation*, 2024 ([doi:10.21203/rs.3.rs-4351526/v1](https://doi.org/10.21203/rs.3.rs-4351526/v1)).
+
+**IDC platform (please cite if you use this library in publication):**
 
 > Fedorov A. et al., *National Cancer Institute Imaging Data Commons*, RadioGraphics 43(12), 2023. https://doi.org/10.1148/rg.230180
 
-## Design notes
+Upstream parquet licensing is separate from this repo — see the [CloudSegmentatorResults repository](https://github.com/ImagingDataCommons/CloudSegmentatorResults).
 
-- **DuckDB httpfs over a GitHub Release asset** → no local 1.35 GB download for a quick query. First query is slow (range-request index), later queries over the same connection hit the HTTP cache.
-- **Chainable Cohort = lazy filter.** Nothing executes until `to_df()`, `count()`, `viewer_urls()`, or `cohort_id()`.
-- **Pinned release.** `DATA_RELEASE` in `catalog.py` names the exact upstream version so `cohort_id()` is reproducible across time.
+---
 
-See [`DESIGN.md`](DESIGN.md) for the longer rationale.
+## Community & contributing
 
-## Status
+This project exists to **lower the bar** for IDC radiomics and TotalSegmentator exploration. Help is welcome.
 
-Alpha. Target the first release at **NLST only** (CloudSegmentatorResults v0.0.1). Follow-ups: CPTAC + CMB (Zenodo Nov 2026), an MCP server, a Streamlit demo tab.
+- **Bug or wrong docs?** [Open an issue](https://github.com/taiaburbd/idc-radiomics/issues).
+- **New cohort patterns or collection support?** PRs against `src/idc_radiomics/` + tests in `tests/`.
+- **Questions about IDC data itself?** [IDC forum](https://discourse.canceridc.dev) and [portal docs](https://learn.canceridc.dev/).
 
-## Licence
+**Troubleshooting**
 
-MIT. The upstream parquet data is licensed separately — see the [CloudSegmentatorResults repo][csr].
+| Symptom | Likely cause |
+|---|---|
+| First query slow | Remote parquet indexing over HTTPS; normal |
+| `Unknown feature` | Use exact strings from `idc_radiomics.FEATURES` (spaces matter) |
+| DuckDB `Illegal instruction` on old VMs | Install a DuckDB wheel built for your CPU, or build from source |
+| Empty cohort | Loosen filters; check `.organs()` for label spelling |
 
-[idc]: https://portal.imaging.datacommons.cancer.gov
-[ts]: https://github.com/wasserth/TotalSegmentator
-[csr]: https://github.com/ImagingDataCommons/CloudSegmentatorResults
-[release]: https://github.com/ImagingDataCommons/CloudSegmentatorResults/releases/tag/0.0.1
-[paper]: https://doi.org/10.21203/rs.3.rs-4351526/v1
+---
+
+## Roadmap
+
+**Now (alpha):** NLST only, CloudSegmentatorResults **v0.0.1**, Python API.
+
+**Next:** CPTAC + CMB from the Nov 2026 Zenodo bundle, optional MCP server, Streamlit demo tab.
+
+---
+
+## License
+
+MIT for this library. See [LICENSE](LICENSE).
+
+---
+
+## Links
+
+| Resource | URL |
+|---|---|
+| IDC portal | https://portal.imaging.datacommons.cancer.gov |
+| CloudSegmentatorResults data | https://github.com/ImagingDataCommons/CloudSegmentatorResults |
+| TotalSegmentator | https://github.com/wasserth/TotalSegmentator |
+| This repo | https://github.com/taiaburbd/idc-radiomics |

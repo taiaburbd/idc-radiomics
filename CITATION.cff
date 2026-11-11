@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use idc-radiomics in a publication, please cite both this software and the upstream IDC paper."
+title: "idc-radiomics: Zero-setup access to TotalSegmentator anatomy and radiomics features for NCI Imaging Data Commons CT scans"
+type: software
+authors:
+  - family-names: Rahman
+    given-names: Taiabur
+    email: taiaburbd@gmail.com
+    orcid: "https://orcid.org/0009-0004-4175-1166"
+version: 0.1.0
+date-released: 2026-11-11
+license: MIT
+repository-code: "https://github.com/taiaburbd/idc-radiomics"
+url: "https://github.com/taiaburbd/idc-radiomics"
+keywords:
+  - medical imaging
+  - radiomics
+  - DICOM
+  - cancer imaging
+  - NCI Imaging Data Commons
+  - TotalSegmentator
+references:
+  - type: article
+    authors:
+      - family-names: Fedorov
+        given-names: Andrey
+      - name: "others"
+    title: "National Cancer Institute Imaging Data Commons: Toward Transparency, Reproducibility, and Scalability in Imaging Artificial Intelligence"
+    journal: "RadioGraphics"
+    volume: 43
+    issue: 12
+    year: 2023
+    doi: "10.1148/rg.230180"

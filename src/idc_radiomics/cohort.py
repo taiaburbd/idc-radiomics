@@ -100,8 +100,8 @@ class Cohort:
         return self._replace(_features=self._features + (f,))
 
     def only_complete(self) -> "Cohort":
-        """Keep only segmentations the upstream QC marked complete
-        (segmentation_completeness = 'complete')."""
+        """Keep only segmentations the upstream QC marked pass
+        (segmentation_completeness = 'pass' in CloudSegmentatorResults 0.0.1)."""
         return self._replace(_only_complete=True)
 
     def patients(self, *patient_ids: str) -> "Cohort":
@@ -193,7 +193,7 @@ class Cohort:
         if self._laterality:
             parts.append(f"LOWER(laterality) = {_quote_literal(self._laterality)}")
         if self._only_complete:
-            parts.append("segmentation_completeness = 'complete'")
+            parts.append("segmentation_completeness = 'pass'")
         if self._patients:
             values = ", ".join(_quote_literal(p) for p in self._patients)
             parts.append(f"PatientID IN ({values})")

@@ -81,7 +81,7 @@ def test_sql_escapes_single_quotes_in_patient_ids():
 def test_sql_only_complete_adds_qc_filter():
     c = Cohort().organ("liver").only_complete()
     sql = c._build_sql(select_cols=c._select_columns(), limit=5)
-    assert "segmentation_completeness = 'complete'" in sql
+    assert "segmentation_completeness = 'pass'" in sql
 
 
 def test_sql_laterality_is_lowercased():
