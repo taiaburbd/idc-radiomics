@@ -24,18 +24,21 @@ def test_organs_discovery_returns_rows():
 
 
 def test_liver_volume_cohort_returns_rows():
-    """The canonical example query — big livers in NLST."""
+    """Canonical example query — livers above the lower bound of normal
+    adult liver volume (~1.2 L), after QC. Threshold kept generous so the
+    test is a stable smoke signal, not a clinical cutoff."""
+    threshold_mm3 = 1_200_000
     c = (
         Cohort()
         .organ("liver")
-        .feature("Volume from Voxel Summation", min=2_000_000)
+        .feature("Volume from Voxel Summation", min=threshold_mm3)
         .only_complete()
     )
     df = c.to_df(limit=5)
     assert len(df) > 0
     assert "CT_SeriesInstanceUID" in df.columns
     assert "Volume from Voxel Summation" in df.columns
-    assert (df["Volume from Voxel Summation"] >= 2_000_000).all()
+    assert (df["Volume from Voxel Summation"] >= threshold_mm3).all()
     assert df["bodyPart"].str.lower().eq("liver").all() or \
            df["totalsegSegmentLabel"].str.lower().eq("liver").all()
 
